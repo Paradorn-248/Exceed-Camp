@@ -42,3 +42,4 @@ def update_one_fruit(name:str,new_price:int) :
     new_value = {'$set':{'price':new_price}}
     menu_collection.update_one(query,new_value)
     return {'result':'done'}
+
