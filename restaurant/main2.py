@@ -1,79 +1,69 @@
-import json
+from datetime import datetime
 from fastapi import FastAPI
-from matplotlib.pyplot import table
 from pymongo import MongoClient
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
 
+origins = [
+    "http://localhost.tiangolo.com",
+    "https://localhost.tiangolo.com",
+    "http://localhost",
+    "http://localhost:8080",
+    "*"
+]
 
-class Reservation(BaseModel):
-    name: str
-    time: int
-    table_number: int
+class Toilet(BaseModel):
+    room: str
+    available: int
 
-
-client = MongoClient('mongodb://localhost', 27018)
-
-# TODO fill in database name
-db = client["exceed_restaurant"]
-
-# TODO fill in collection name
-collection = db["reserve"]
+client = MongoClient('mongodb://localhost', 27017)
+db = client["toilet"]
 
 app = FastAPI()
 
-# TODO complete all endpoint.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+@app.get("/")
+def start():
+    return {"status": "OK"}
 
-@app.get("/reservation/by-name/{name}")
-def get_reservation_by_name(name: str):
-    query = {"name": name}
-    r = collection.find(query, {"_id": 0, "name": 1, "time": 1, "table_number": 1})
-    listt = list()
-    for i in r:
-        listt.append(i)
-    return {"result": listt}
+@app.get("/get/{room}")
+def get_room(room: str):
+    return {"result": db[room].find_one({}, {"_id": 0})}
 
+@app.put('/toilet')
+def update_1(toilet: Toilet):
+    t = jsonable_encoder(toilet)
+    if t['available'] == 1:
+        db[t['room']].update_one({"room":t['room']},{"$set":{"time":datetime.now()}})
+        return {'status':'Done1'}    
+    
+    r = db[t['room']].find_one()
+    a = r['amount']
+    time = (datetime.now() - r['time']).total_seconds()
+    if t['available'] == 0:
+        db[t['room']].update_one({"room":t['room']},{"$set":{"amount":a+1,"totaltime":r['totaltime']+time}})
+        return {'status':'Done0'}
 
-@app.get("/reservation/by-table/{table}")
-def get_reservation_by_table(table: int):
-    query = {"table_number": table}
-    r = collection.find(query, {"_id": 0, "name": 1, "time": 1, "table_number": 1})
-    listt = list()
-    for i in r:
-        print(i)
-        listt.append(i)
-    return {"result": listt}
-
-
-@app.post("/reservation")
-def reserve(reservation : Reservation):
-    book = jsonable_encoder(reservation)
-    query = {'time':book['time'],'table_number':book['table_number']}
-    f = collection.find(query)
-    for i in f:
-        if book['time'] == i['time'] :
-            return {"result" : "Can't reserve"}
-    collection.insert_one(book)
-    return {"result" : "Reserve done"}
-
-
-@app.put("/reservation/update/")
-def update_reservation(reservation: Reservation):
-    n = jsonable_encoder(reservation)
-    print(n)
-    query = {'time':n['time'],'table_number':n['table_number']}
-    new_value = {'$set':query}
-    f = collection.find({'$and':[{'time':n['time']},{'table_number':n['table_number']}]})
-    # print(type(f))
-    print(len(list(f)))
-    if len(list(f))==0:
-        collection.update_one({'name':n['name']},new_value)
-        return {"result": "Update done"}
-    return {"result": "Can't update"}
-
-
-@app.delete("/reservation/delete/{name}/{table_number}")
-def cancel_reservation(name: str, table_number: int):
-    query = {'name': name, 'table_number': table_number}
-    collection.delete_one(query)
+@app.get('/estimate')
+def get_estimate():
+    # return {}
+    ans = {
+        '1': 0,
+        '2': 0,
+        '3': 0
+    }
+    for i in range(1,4):
+        r = db[str(i)].find_one()
+        if r['amount'] == 0:
+            continue
+        else :
+            ans[str(i)] = r['totaltime']/r['amount']
+    return {'estimate': ans}
