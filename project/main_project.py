@@ -33,6 +33,11 @@ class Sensor(BaseModel):
     wind: float
 
 
+class Login(BaseModel):
+    username: str
+    password:str
+
+
 client = MongoClient('mongodb://localhost', 27018)
 db = client["Project"]
 db_addr = db["Address"]
@@ -101,3 +106,15 @@ def update_sensor(sensor: Sensor, username: str):
                                               "shake": s["shake"],
                                               "wind": s["wind"]}})
     return {"result": "Update success"}
+
+
+@app.post("/check")
+def check_pass(login:Login):
+    l = jsonable_encoder(login)
+    query = {"username":l["username"]}
+    res = db_user.find_one(query,{"_id":0})
+    hash_input_pass = hashlib.sha256(l["password"].encode()).hexdigest()
+    if hash_input_pass == res["password"] :
+        return {"result": True}
+    else:
+        return {"result": False}
