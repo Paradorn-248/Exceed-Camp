@@ -1,4 +1,3 @@
-from datetime import datetime
 from fastapi import FastAPI
 from pymongo import MongoClient
 from pydantic import BaseModel
